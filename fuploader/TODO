@@ -1,7 +1,6 @@
 TODO
-1. upload file to upload/uniquefileID
-2. return a link /results/uniquefileID
-3. that links returns work in progress for N seconds, then returns sample file
+1. that links returns work in progress for N seconds, then returns sample file
+everything in one site
 
 \\\\\\\\\\\\\\\\\\\
 POC:

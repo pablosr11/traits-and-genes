@@ -12,11 +12,20 @@
     File <input type="file" id="f" />
     <button id="btnUpload">Upload</button>
     <div id="progressTracker"></div>
+    <a id="results" href=""></a>
 
     <script>
       const btnUpload = document.getElementById("btnUpload");
       const progressTracker = document.getElementById("progressTracker");
       const f = document.getElementById("f");
+      const resultsLink = document.getElementById("results");
+
+      function hashThis(ss) {
+        let hash = 5381;
+        let i = ss.length;
+        while (i) hash = (hash * 33) ^ ss.charCodeAt(--i);
+        return hash >>> 0;
+      }
 
       function is_valid(theFile) {
         return (
@@ -29,7 +38,7 @@
       btnUpload.addEventListener("click", () => {
         const reader = new FileReader();
         const theFile = f.files[0];
-        const fileName = Math.random() * 100 + theFile.name;
+        const fileName = Math.random() + theFile.name;
 
         if (is_valid(theFile)) {
           progressTracker.textContent = "Issue with File";
@@ -42,20 +51,40 @@
           const chunkCount = Math.ceil(
             event.target.result.byteLength / CHUNK_SIZE
           );
+          const identifier = hashThis(fileName);
+          const url = `http://localhost:8080/upload?i=${identifier}`;
 
           for (let chunkId = 0; chunkId < chunkCount + 1; chunkId++) {
             const filechunk = event.target.result.slice(
               chunkId * CHUNK_SIZE,
               chunkId * CHUNK_SIZE + CHUNK_SIZE
             );
-            await fetch("http://localhost:8080/upload", {
-              method: "POST",
-              headers: {
-                "content-type": "application/octet-stream",
-                "content-length": filechunk.length,
-              },
-              body: filechunk,
-            }).catch((error) => console.log(error));
+            if (chunkId === chunkCount) {
+              // last block
+              await fetch(url + `&q=${theFile.size}`, {
+                method: "POST",
+                headers: {
+                  "content-type": "application/octet-stream",
+                  "content-length": filechunk.length,
+                },
+                body: filechunk,
+              })
+                .then((response) => response.json())
+                .then((data) => {
+                  resultsLink.href = data["link"];
+                  resultsLink.textContent = "Results Here";
+                })
+                .catch((error) => console.log(error));
+            } else {
+              await fetch(url, {
+                method: "POST",
+                headers: {
+                  "content-type": "application/octet-stream",
+                  "content-length": filechunk.length,
+                },
+                body: filechunk,
+              }).catch((error) => console.log(error));
+            }
             // if a chunk fails, whole file becomes corrupt?
 
             progressTracker.textContent =
@@ -65,7 +94,7 @@
           }
         };
         reader.readAsArrayBuffer(theFile);
-        f.value = "uploading";
+        f.value = "";
       });
     </script>
   </body>
