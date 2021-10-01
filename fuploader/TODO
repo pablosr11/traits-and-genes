@@ -1,6 +1,6 @@
 TODO
-1. that links returns work in progress for N seconds, then returns sample file
-everything in one site
+when upload is ready, generate a clickable button to a link that will return some json until results are rready
+1. link to download populates temp field until download is ready
 
 \\\\\\\\\\\\\\\\\\\
 POC:

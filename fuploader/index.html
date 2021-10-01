@@ -12,13 +12,14 @@
     File <input type="file" id="f" />
     <button id="btnUpload">Upload</button>
     <div id="progressTracker"></div>
-    <a id="results" href=""></a>
+    <button hidden id="results"></a>
 
     <script>
       const btnUpload = document.getElementById("btnUpload");
       const progressTracker = document.getElementById("progressTracker");
       const f = document.getElementById("f");
-      const resultsLink = document.getElementById("results");
+      const resultsBtn = document.getElementById("results");
+      let resultsLink;
 
       function hashThis(ss) {
         let hash = 5381;
@@ -71,8 +72,10 @@
               })
                 .then((response) => response.json())
                 .then((data) => {
-                  resultsLink.href = data["link"];
-                  resultsLink.textContent = "Results Here";
+                  resultsBtn.hidden = false;
+                  resultsBtn.textContent = "Results Here";
+                  resultsLink = data["link"];
+
                 })
                 .catch((error) => console.log(error));
             } else {
@@ -95,6 +98,21 @@
         };
         reader.readAsArrayBuffer(theFile);
         f.value = "";
+      });
+
+      resultsBtn.addEventListener("click", async (e) => {
+        console.log(`Requesting ${resultsLink}`)
+        let r = await fetch(resultsLink);
+        let data = await r.json();
+        if ("link" in data){
+          progressTracker.textContent = "Completed, click to download";
+          window.open(data["link"])
+          await fetch(data["link"])
+        } else {
+          progressTracker.textContent = "Not yet, try again in 1 minute";
+        }
+        
+
       });
     </script>
   </body>
