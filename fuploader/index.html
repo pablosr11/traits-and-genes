@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DNETICS</title>
+  </head>
+  <body>
+    <h1>Upload your file</h1>
+
+    File <input type="file" id="f" />
+    <button id="btnUpload">Upload</button>
+    <div id="progressTracker"></div>
+
+    <script>
+      const btnUpload = document.getElementById("btnUpload");
+      const progressTracker = document.getElementById("progressTracker");
+      const f = document.getElementById("f");
+
+      function is_valid(theFile) {
+        return (
+          theFile.type != "text/csv" ||
+          theFile.size > 30_000_000 ||
+          theFile.size < 15_000_000
+        );
+      }
+
+      btnUpload.addEventListener("click", () => {
+        const reader = new FileReader();
+        const theFile = f.files[0];
+        const fileName = Math.random() * 100 + theFile.name;
+
+        if (is_valid(theFile)) {
+          progressTracker.textContent = "Issue with File";
+          return;
+        }
+
+        // refactor, small testable functions. SINGLE RESPONSABILITY.
+        reader.onload = async (event) => {
+          const CHUNK_SIZE = 1_000_000; //1mb
+          const chunkCount = Math.ceil(
+            event.target.result.byteLength / CHUNK_SIZE
+          );
+
+          for (let chunkId = 0; chunkId < chunkCount + 1; chunkId++) {
+            const filechunk = event.target.result.slice(
+              chunkId * CHUNK_SIZE,
+              chunkId * CHUNK_SIZE + CHUNK_SIZE
+            );
+            await fetch("http://localhost:8080/upload", {
+              method: "POST",
+              headers: {
+                "content-type": "application/octet-stream",
+                "content-length": filechunk.length,
+              },
+              body: filechunk,
+            }).catch((error) => console.log(error));
+            // if a chunk fails, whole file becomes corrupt?
+
+            progressTracker.textContent =
+              "Upload progress: " +
+              Math.round((chunkId / chunkCount) * 100) +
+              "%";
+          }
+        };
+        reader.readAsArrayBuffer(theFile);
+        f.value = "uploading";
+      });
+    </script>
+  </body>
+</html>

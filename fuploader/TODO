@@ -1,0 +1,21 @@
+TODO
+1. upload file to upload/uniquefileID
+2. return a link /results/uniquefileID
+3. that links returns work in progress for N seconds, then returns sample file
+
+\\\\\\\\\\\\\\\\\\\
+POC:
+User uploads a file (and a password?)
+Gets a link to download the file when its ready
+
+The backend receives the file
+Process it (appends whatever is necessary)
+Makes it available for download on the specified link (with a password?)
+\\\\\\\\\\\\\\\\\\\
+
+
+How do we diferrentiate between diff files? 
+    Add identifier on upload and upload to specific path /upload/3904684098
+    Backend accepts wildcard and uses it to group them together.
+    
+
