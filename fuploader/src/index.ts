@@ -1,11 +1,18 @@
 import express from "express";
 import fs from "fs";
+import cors from "cors";
 
 const app = express();
 const port = 8080; // default port to listen
-app.engine("html", require("ejs").renderFile);
-
 const HOST = `http://localhost:${port}`;
+
+// specify what origins can send request
+// null works for local html file, change when proxy server etc are setup
+const corsOptions = {
+  origin: `null`,
+};
+
+app.use(cors(corsOptions));
 
 // start the Express server
 app.listen(port, () => {
@@ -13,7 +20,8 @@ app.listen(port, () => {
 });
 
 app.get("/", (req, res) => {
-  res.render("/Users/pablo.sanderson/repos/myheritage/fuploader/index.html");
+  //load html file directly instead
+  res.json({ info: "Wrong site" });
 });
 
 app.get("/result/:jobId", (req, res) => {
@@ -46,5 +54,5 @@ app.post("/upload", (req, res) => {
     console.log(`Upload completed: ${filename}`);
     res.json({ link: `${HOST}/status/${name}` });
   }
-  res.end();
+  res.send("OK");
 });
