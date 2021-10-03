@@ -1,6 +1,9 @@
+
+
 TODO
-when upload is ready, generate a clickable button to a link that will return some json until results are rready
-1. link to download populates temp field until download is ready
+1. mini refactor (specially repeating code)
+2. trigger workload on upload, check job status
+- add chunksid to identify missing chunks. that way we can separate the server from the chunk/file storage
 
 \\\\\\\\\\\\\\\\\\\
 POC:
