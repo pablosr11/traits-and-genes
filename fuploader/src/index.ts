@@ -25,6 +25,7 @@ app.get("/", (req, res) => {
 });
 
 app.get("/result/:jobId", (req, res) => {
+  // query for job id, return when ready
   res.download("/Users/pablo.sanderson/repos/myheritage/fuploader/TODO");
 });
 
@@ -34,7 +35,8 @@ app.get("/status/:jobId", (req, res) => {
   if (isready) {
     res.json({ link: `${HOST}/result/${req.params["jobId"]}` });
   } else {
-    res.json({ isready: 0 });
+    res.statusCode = 202;
+    res.send("Not ready yet");
     isready = true;
   }
 });
@@ -45,11 +47,14 @@ app.post("/upload", (req, res) => {
 
   req.on("data", (chunk) => {
     // add ID to identify each chunk - to detect missing packets
+    // this also ties data to the api. ideally we could send it to a DB? to consolidate the chunks later?
+    // and use the id to put if together? probs need to add a chunk id too.
     fs.appendFileSync(filename, chunk);
     console.log(`received ${chunk.length}. Storing in ${filename}`);
   });
 
   // check if final header included, and filesize is equal to it
+  // if yes, return link to results download
   if (req.query["q"] && +req.query["q"] === fs.statSync(filename).size) {
     console.log(`Upload completed: ${filename}`);
     res.json({ link: `${HOST}/status/${name}` });
