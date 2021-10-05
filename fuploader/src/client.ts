@@ -1,7 +1,7 @@
-const btnUpload = document.getElementById("btnUpload");
-const progressTracker = document.getElementById("progressTracker");
-const f = <HTMLInputElement>document.getElementById("f");
-const resultsBtn = document.getElementById("results");
+const btnUpload = <HTMLButtonElement>document.getElementById("btnUpload");
+const progressTracker = <HTMLDivElement>document.getElementById("progress");
+const fileInput = <HTMLInputElement>document.getElementById("f");
+const resultsBtn = <HTMLButtonElement>document.getElementById("results");
 let resultsLink: string;
 
 function hashThis(s: string) {
@@ -13,21 +13,24 @@ function hashThis(s: string) {
 
 function is_valid(theFile: File) {
   return (
-    theFile.type != "text/csv" ||
-    theFile.size > 30_000_000 ||
-    theFile.size < 15_000_000
+    theFile.type === "text/csv" &&
+    theFile.size <= 30_000_000 &&
+    theFile.size >= 15_000_000
   );
 }
 
-btnUpload.addEventListener("click", () => {
-  const reader = new FileReader();
-  const theFile = f.files[0];
-  const fileName = Math.random() + theFile.name;
+async function handleUpload(
+  r: Response,
+  btn: HTMLButtonElement
+): Promise<string> {
+  btn.textContent = "Click here for Results";
+  btn.hidden = false;
+  return r.text();
+}
 
-  if (is_valid(theFile)) {
-    progressTracker.textContent = "Issue with File";
-    return;
-  }
+function wait(delay: number) {
+  return new Promise((resolve) => setTimeout(resolve, delay));
+}
 
   // refactor, small testable functions. SINGLE RESPONSABILITY.
   reader.onload = async (event) => {
