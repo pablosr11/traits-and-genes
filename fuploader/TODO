@@ -1,8 +1,7 @@
 
 
 TODO
-1. mini refactor (specially repeating code)
-2. trigger workload on upload, check job status
+1. trigger workload on upload, check job status
 - add chunksid to identify missing chunks. that way we can separate the server from the chunk/file storage
 
 \\\\\\\\\\\\\\\\\\\
@@ -16,8 +15,4 @@ Makes it available for download on the specified link (with a password?)
 \\\\\\\\\\\\\\\\\\\
 
 
-How do we diferrentiate between diff files? 
-    Add identifier on upload and upload to specific path /upload/3904684098
-    Backend accepts wildcard and uses it to group them together.
-    
 
