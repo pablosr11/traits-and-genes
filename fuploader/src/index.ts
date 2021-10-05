@@ -21,7 +21,7 @@ app.listen(port, () => {
 
 app.get("/", (req, res) => {
   //load html file directly instead
-  res.json({ info: "Wrong site" });
+  res.send("Wrong site");
 });
 
 app.get("/result/:jobId", (req, res) => {
@@ -32,32 +32,34 @@ app.get("/result/:jobId", (req, res) => {
 let isready = false;
 app.get("/status/:jobId", (req, res) => {
   // check work is ready, if not update field
+  // we could check in DB here if all chunks are there.
   if (isready) {
-    res.json({ link: `${HOST}/result/${req.params["jobId"]}` });
+    res.status(200).send(`${HOST}/result/${req.params["jobId"]}`);
   } else {
-    res.statusCode = 202;
-    res.send("Not ready yet");
+    res.status(202).send("Not ready yet");
     isready = true;
   }
 });
 
 app.post("/upload", (req, res) => {
-  let name = req.query["i"];
-  let filename = name + ".csv";
+  let fileId = req.query["i"] as string;
+  var [chunkId, total] = (req.query["d"] as string).split("o");
 
   req.on("data", (chunk) => {
-    // add ID to identify each chunk - to detect missing packets
+    // use chunk id to detect missing packets
     // this also ties data to the api. ideally we could send it to a DB? to consolidate the chunks later?
-    // and use the id to put if together? probs need to add a chunk id too.
-    fs.appendFileSync(filename, chunk);
-    console.log(`received ${chunk.length}. Storing in ${filename}`);
+    fs.appendFileSync(fileId + ".csv", chunk);
+    console.log(
+      `rcv ${chunkId} out of ${total} - ${chunk.length} goes in ${fileId}`
+    );
   });
 
   // check if final header included, and filesize is equal to it
   // if yes, return link to results download
-  if (req.query["q"] && +req.query["q"] === fs.statSync(filename).size) {
-    console.log(`Upload completed: ${filename}`);
-    res.json({ link: `${HOST}/status/${name}` });
+  if (chunkId === total) {
+    console.log(`Upload completed: ${fileId}`);
+    res.status(200).send(`${HOST}/status/${fileId}`);
+  } else {
+    res.status(202).send("OK");
   }
-  res.send("OK");
 });
