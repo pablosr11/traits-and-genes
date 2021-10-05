@@ -1,6 +1,7 @@
 import express from "express";
 import fs from "fs";
 import cors from "cors";
+import axios from "axios";
 
 const app = express();
 const port = 8080; // default port to listen
@@ -41,7 +42,7 @@ app.get("/status/:jobId", (req, res) => {
   }
 });
 
-app.post("/upload", (req, res) => {
+app.post("/upload", async (req, res) => {
   let fileId = req.query["i"] as string;
   var [chunkId, total] = (req.query["d"] as string).split("o");
 
@@ -58,6 +59,8 @@ app.post("/upload", (req, res) => {
   // if yes, return link to results download
   if (chunkId === total) {
     console.log(`Upload completed: ${fileId}`);
+    // trigger background job with ID fileId.
+    await axios.post(`http://localhost:8000/candy/${fileId}`);
     res.status(200).send(`${HOST}/status/${fileId}`);
   } else {
     res.status(202).send("OK");
