@@ -2,7 +2,7 @@
 
 TODO
 1. trigger workload on upload, check job status
-- add chunksid to identify missing chunks. that way we can separate the server from the chunk/file storage
+- Separate the server from the chunk/file storage. Currently its tied to webapp server (we write to local disk). If we had multiple backends, diff chunks might go to diff backends.
 
 \\\\\\\\\\\\\\\\\\\
 POC:
@@ -13,6 +13,7 @@ The backend receives the file
 Process it (appends whatever is necessary)
 Makes it available for download on the specified link (with a password?)
 \\\\\\\\\\\\\\\\\\\
+
 
 
 
