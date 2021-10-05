@@ -74,15 +74,20 @@ btnUpload.addEventListener("click", () => {
   f.value = "";
 });
 
-resultsBtn.addEventListener("click", async (e) => {
-  console.log(`Requesting ${resultsLink}`);
-  let r = await fetch(resultsLink);
-  let data = await r.json();
-  if ("link" in data) {
-    progressTracker.textContent = "Completed, click to download";
-    window.open(data["link"]);
-    await fetch(data["link"]);
+async function downloadResults(url: string, tracker: HTMLDivElement) {
+  console.log(`Requesting ${url}`);
+  let r = await fetch(url);
+  if (r.status === 200) {
+    tracker.textContent =
+      "Completed, Download should have started. Click if it hasnt.";
+    let link = await r.text();
+    // replace this by a <a href> with download attribute?
+    window.open(link);
   } else {
-    progressTracker.textContent = "Not yet, try again in 1 minute";
+    tracker.textContent = "Not yet, try again in 1 minute";
   }
-});
+}
+
+resultsBtn.addEventListener("click", (_) =>
+  downloadResults(resultsLink, progressTracker)
+);
