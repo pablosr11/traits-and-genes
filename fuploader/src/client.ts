@@ -51,22 +51,17 @@ async function fetchRetry(
 }
 
 async function uploadFile(
-  ev: ProgressEvent<FileReader>,
+  file: ArrayBuffer,
   file_id: number,
   tracker: HTMLDivElement
 ) {
   const chunkSize = 1_000_000; //1mb
-  const chunkCount = Math.ceil(
-    (<ArrayBuffer>ev.target.result).byteLength / chunkSize
-  );
+  const chunkCount = Math.ceil(file.byteLength / chunkSize);
   const url = `http://localhost:8080/upload?i=${file_id}`;
   for (let cid = 0; cid < chunkCount + 1; cid++) {
     const request_init: RequestInit = {
       method: "POST",
-      body: ev.target.result.slice(
-        cid * chunkSize,
-        cid * chunkSize + chunkSize
-      ),
+      body: file.slice(cid * chunkSize, cid * chunkSize + chunkSize),
     };
     const url_with_chunkid = url + `&d=${cid}o${chunkCount}`;
 
@@ -97,7 +92,10 @@ btnUpload.addEventListener("click", () => {
   }
 
   // when file is entirely read... chunk it up and post it
-  reader.onload = async (e) => uploadFile(e, identifier, progressTracker);
+  reader.onload = async (e) => {
+    let file_buffer = e.target.result as ArrayBuffer;
+    uploadFile(file_buffer, identifier, progressTracker);
+  };
   reader.readAsArrayBuffer(theFile);
   fileInput.value = "";
 });
