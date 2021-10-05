@@ -1,19 +1,24 @@
 """
+- dont run genes and gwas every time. load from existing DB. 
+    - (dont create 309509 db, use one with GWAS, GENES preloaded. Create urSNP one,  )
+- include genes
+- from backgorund task to redis+rq (so we can do more than 1)
+
 # Given a myheritage.csv results file:
 - return known traits/studies for those rsids
     - GET list of rsid from frontend, query database on backend. 
 - return set of GENES for the given rsids
-
-- from backgorund task to redis+rq (so we can do more than 1)
-- improve error messages. Instead of error, specify where/why theres an error
 
 - DB stuff
     - Full analysis of queries. Create index where apropiate
         - Traits query SELECT * FROM WHERE rsid in (VERY LARGE). Temp table vs large in.
         - Genes query
     -
-    - don run genes and gwas every fucking time. load from backup
+
     - speed up genes addition. index on positions or txstart/end?
+
+
+DOWNLOAD GWAS: https://www.ebi.ac.uk/gwas/docs/file-downloads
 
 """
 from datetime import datetime
@@ -23,10 +28,15 @@ import pandas as pd
 from fastapi import BackgroundTasks, FastAPI
 from snps import SNPs
 from sqlalchemy import create_engine
+from sqlalchemy.engine.base import Engine
 from starlette.responses import Response
 
-FILESIZE = 40_000_000  # ~mb
-KEEP_FILES = True
+from urllib.request import urlretrieve
+
+GWAS_URL = "https://www.ebi.ac.uk/gwas/api/search/downloads/alternative"
+GWAS_FILEPATH = f"resources/gwas_{datetime.today().strftime('%d%m%Y')}.tsv"
+MYHERITAGE_TABLE = "myheritage"
+GWAS_TABLE = "gwas"
 
 app = FastAPI()
 origins = ["null"]
@@ -45,8 +55,11 @@ async def read_root():
     return Response(status_code=200)
 
 
-@app.post("/candy/{id}")
-async def process_file(bt: BackgroundTasks, id: int):
+@app.get("/gwas")
+async def gwas_endpoint(bt: BackgroundTasks):
+    bt.add_task(urlretrieve, url=GWAS_URL, filename=GWAS_FILEPATH)
+    return Response("Triggered", status_code=200)
+
 
     # Trigger background task to run the party
     print("hey yeeey")
