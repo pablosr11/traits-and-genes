@@ -16,27 +16,20 @@
     - speed up genes addition. index on positions or txstart/end?
 
 """
-import os
-import shutil
-from random import choice
-from string import ascii_lowercase
-from tempfile import NamedTemporaryFile
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 
 import pandas as pd
-from fastapi import BackgroundTasks, Body, FastAPI, File, Form, UploadFile, status
-from fastapi.responses import FileResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi import BackgroundTasks, FastAPI
 from snps import SNPs
 from sqlalchemy import create_engine
+from starlette.responses import Response
 
 FILESIZE = 40_000_000  # ~mb
 KEEP_FILES = True
 
 app = FastAPI()
-app.mount("/htmls", StaticFiles(directory="htmls"), name="htmls")
-origins = ["http://localhost:3000"]
+origins = ["null"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -49,65 +42,17 @@ app.add_middleware(
 
 @app.get("/")
 async def read_root():
-    return FileResponse("htmls/index.html")
+    return Response(status_code=200)
 
 
-@app.get("/good")
-async def success():
-    return FileResponse("htmls/good.html")
-
-
-@app.get("/bad")
-async def failure():
-    return FileResponse("htmls/bad.html")
-
-
-async def validate_request(file):
-
-    if file.filename[-4:] != ".csv":
-        print("bad format")
-        return None
-
-    fline = file.file.readline()
-    file.file.seek(0)
-    if b"##fileformat=MyHeritage" not in fline:
-        print("bad first line", fline)
-        return None
-
-    filename = generate_filename()
-    real_file_size = 0
-    with NamedTemporaryFile(delete=False) as temp:
-        for chunk in file.file:
-            real_file_size += len(chunk)
-            if real_file_size > FILESIZE:
-                print("too big")
-                return None
-            temp.write(chunk)
-        shutil.move(temp.name, filename)
-    return filename
-
-
-@app.post("/qq")
-async def query_rsids(rsids=Body(...)):
-    # query db for these RSIDS. return file?
-    return {"got": rsids}
-
-
-@app.post("/candy")
-async def process_file(
-    bt: BackgroundTasks, candy_address: str = Form(...), candy: UploadFile = File(...)
-):
-
-    filename = await validate_request(candy_address, candy)
-
-    if not filename:
-        return RedirectResponse(url="/bad", status_code=status.HTTP_303_SEE_OTHER)
+@app.post("/candy/{id}")
+async def process_file(bt: BackgroundTasks, id: int):
 
     # Trigger background task to run the party
     print("hey yeeey")
     # bt.add_task(magic, filename=filename)
 
-    return RedirectResponse(url="/good", status_code=status.HTTP_303_SEE_OTHER)
+    return Response("Started", status_code=202)
 
 
 def magic(filename):
@@ -136,11 +81,6 @@ def magic(filename):
 
     generate_report(db, table_name, filename)
 
-    if not KEEP_FILES:
-        os.remove(filename)
-        os.remove(DB_FILE)
-        print("files removed")
-
     print(filename)
     print(f":::End of party - {datetime.now()}")
 
@@ -159,8 +99,7 @@ def build_snp(fname):
 
 def load_myheritage(db, snp):
     MYHERITAGE_TABLE = "myheritage"
-    snp.snps[["chrom", "genotype"]] = snp.snps[[
-        "chrom", "genotype"]].astype("string")
+    snp.snps[["chrom", "genotype"]] = snp.snps[["chrom", "genotype"]].astype("string")
     snp.snps.to_sql(MYHERITAGE_TABLE, db)
     print(f"{MYHERITAGE_TABLE} imported!")
     return MYHERITAGE_TABLE
@@ -251,7 +190,3 @@ def create_output(db, table_name, MYHERITAGE_TABLE, GWAS_TABLE):
 def generate_report(db, table_name, filename):
     df = pd.read_sql_table(table_name, db)
     df.to_csv(filename)
-
-
-def generate_filename():
-    return "tmp/" + "".join([choice(ascii_lowercase) for _ in range(10)]) + ".csv"
