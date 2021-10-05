@@ -32,42 +32,57 @@ function wait(delay: number) {
   return new Promise((resolve) => setTimeout(resolve, delay));
 }
 
-  // refactor, small testable functions. SINGLE RESPONSABILITY.
-  reader.onload = async (event) => {
-    const CHUNK_SIZE = 1_000_000; //1mb
-    const chunkCount = Math.ceil(
-      (<ArrayBuffer>event.target.result).byteLength / CHUNK_SIZE
+async function fetchRetry(
+  url: string,
+  delay: number = 1000, //1s
+  tries: number,
+  fetchOptions: RequestInit
+): Promise<Response> {
+  async function onError(err: Error) {
+    let triesLeft = tries - 1;
+    if (!triesLeft) {
+      throw err;
+    }
+    return wait(delay).then(() =>
+      fetchRetry(url, delay, triesLeft, fetchOptions)
     );
-    const identifier = hashThis(fileName);
-    const url = `http://localhost:8080/upload?i=${identifier}`;
+  }
+  return fetch(url, fetchOptions).catch(onError);
+}
 
-    for (let chunkId = 0; chunkId < chunkCount + 1; chunkId++) {
-      const filechunk = <ArrayBuffer>(
-        event.target.result.slice(
-          chunkId * CHUNK_SIZE,
-          chunkId * CHUNK_SIZE + CHUNK_SIZE
-        )
-      );
-      if (chunkId === chunkCount) {
-        // last block
-        await fetch(url + `&q=${theFile.size}`, {
-          method: "POST",
-          body: filechunk,
-        })
-          .then((response) => response.json())
-          .then((data) => {
-            resultsBtn.hidden = false;
-            resultsBtn.textContent = "Results Here";
-            resultsLink = data["link"];
-          })
-          .catch((error) => console.log(error));
-      } else {
-        await fetch(url, {
-          method: "POST",
-          body: filechunk,
-        }).catch((error) => console.log(error));
-      }
-      // if a chunk fails, whole file becomes corrupt?
+async function uploadFile(
+  ev: ProgressEvent<FileReader>,
+  file_id: number,
+  tracker: HTMLDivElement
+) {
+  const chunkSize = 1_000_000; //1mb
+  const chunkCount = Math.ceil(
+    (<ArrayBuffer>ev.target.result).byteLength / chunkSize
+  );
+  const url = `http://localhost:8080/upload?i=${file_id}`;
+  for (let cid = 0; cid < chunkCount + 1; cid++) {
+    const request_init: RequestInit = {
+      method: "POST",
+      body: ev.target.result.slice(
+        cid * chunkSize,
+        cid * chunkSize + chunkSize
+      ),
+    };
+    const url_with_chunkid = url + `&d=${cid}o${chunkCount}`;
+
+    // retry in case filechunk fails
+    let r = await fetchRetry(url_with_chunkid, 100, 3, request_init);
+
+    tracker.textContent =
+      "Upload progress: " + Math.round((cid / chunkCount) * 100) + "%";
+
+    // last block
+    if (cid === chunkCount) {
+      // modifying global var... annoying
+      resultsLink = await handleUpload(r, resultsBtn);
+    }
+  }
+}
 
       progressTracker.textContent =
         "Upload progress: " + Math.round((chunkId / chunkCount) * 100) + "%";
