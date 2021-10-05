@@ -84,12 +84,22 @@ async function uploadFile(
   }
 }
 
-      progressTracker.textContent =
-        "Upload progress: " + Math.round((chunkId / chunkCount) * 100) + "%";
-    }
-  };
+btnUpload.addEventListener("click", () => {
+  const reader = new FileReader();
+  const theFile = fileInput.files[0];
+  // is this random enough? we might f up with bad identifier (eventhough we keep results for a small time)
+  const fileName = Math.random() + theFile.name;
+  const identifier = hashThis(fileName);
+
+  if (!is_valid(theFile)) {
+    progressTracker.textContent = "Issue with File";
+    return;
+  }
+
+  // when file is entirely read... chunk it up and post it
+  reader.onload = async (e) => uploadFile(e, identifier, progressTracker);
   reader.readAsArrayBuffer(theFile);
-  f.value = "";
+  fileInput.value = "";
 });
 
 async function downloadResults(url: string, tracker: HTMLDivElement) {
