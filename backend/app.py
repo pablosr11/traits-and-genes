@@ -4,14 +4,8 @@
     - GET list of rsid from frontend, query database on backend. 
 - return set of GENES for the given rsids
 
-
-- Change gmail. size not big enough. make sure gmail is not going to close my account. use other account
 - from backgorund task to redis+rq (so we can do more than 1)
-- decide what to include in final output
 - improve error messages. Instead of error, specify where/why theres an error
-- react/vue frontend
-- add about page - purpose, donation, data protection
-
 
 - DB stuff
     - Full analysis of queries. Create index where apropiate
@@ -21,15 +15,9 @@
     - don run genes and gwas every fucking time. load from backup
     - speed up genes addition. index on positions or txstart/end?
 
-
 """
-import mimetypes
 import os
-import re
 import shutil
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from random import choice
 from string import ascii_lowercase
 from tempfile import NamedTemporaryFile
@@ -44,10 +32,7 @@ from snps import SNPs
 from sqlalchemy import create_engine
 
 FILESIZE = 40_000_000  # ~mb
-EMAIL_PATTERN = re.compile(
-    r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)")
 KEEP_FILES = True
-SEND_EMAIL = False
 
 app = FastAPI()
 app.mount("/htmls", StaticFiles(directory="htmls"), name="htmls")
@@ -77,11 +62,7 @@ async def failure():
     return FileResponse("htmls/bad.html")
 
 
-async def validate_request(email, file):
-
-    if not EMAIL_PATTERN.match(email):
-        print("bad email")
-        return None
+async def validate_request(file):
 
     if file.filename[-4:] != ".csv":
         print("bad format")
@@ -122,16 +103,15 @@ async def process_file(
     if not filename:
         return RedirectResponse(url="/bad", status_code=status.HTTP_303_SEE_OTHER)
 
-    # Trigger background task to run the party and send email
+    # Trigger background task to run the party
     print("hey yeeey")
-    # bt.add_task(magic, filename=filename, email=candy_address)
+    # bt.add_task(magic, filename=filename)
 
     return RedirectResponse(url="/good", status_code=status.HTTP_303_SEE_OTHER)
 
 
-def magic(filename, email):
+def magic(filename):
     # create all the stuff
-    # send email with good or bad
 
     print(f":::Starting the party - {datetime.now()}")
 
@@ -156,15 +136,12 @@ def magic(filename, email):
 
     generate_report(db, table_name, filename)
 
-    if SEND_EMAIL and ("gmail" in email or "hotmail" in email):
-        send_email(email, filename)
-
     if not KEEP_FILES:
         os.remove(filename)
         os.remove(DB_FILE)
         print("files removed")
 
-    print(email, filename)
+    print(filename)
     print(f":::End of party - {datetime.now()}")
 
 
@@ -274,39 +251,6 @@ def create_output(db, table_name, MYHERITAGE_TABLE, GWAS_TABLE):
 def generate_report(db, table_name, filename):
     df = pd.read_sql_table(table_name, db)
     df.to_csv(filename)
-
-
-def send_email(to, attachment, emailfrom="noreply@genalytics.com"):
-    print(":::Start email")
-    FROM = emailfrom
-    TO = to
-    fileToSend = attachment
-
-    msg = MIMEMultipart()
-    msg["Subject"] = "Your Genalytics results"
-    msg["From"] = FROM
-    msg["To"] = TO
-    msg.preamble = "The results are attached"
-
-    ctype, encoding = mimetypes.guess_type(fileToSend)
-    if ctype is None or encoding is not None:
-        ctype = "application/octet-stream"
-    _, subtype = ctype.split("/", 1)
-
-    with open(fileToSend) as fp:
-        attachment = MIMEText(fp.read(), _subtype=subtype)
-
-    attachment.add_header("Content-Disposition",
-                          "attachment", filename=fileToSend)
-    msg.attach(attachment)
-
-    print("Sending...")
-    with smtplib.SMTP("smtp.gmail.com:587") as server:
-        server.starttls()
-        server.login("pablosr11@gmail.com", "pjbgwxkakhapluhi")
-        server.sendmail(FROM, TO, msg.as_string())
-
-    print(":::Done sending email")
 
 
 def generate_filename():
