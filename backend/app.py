@@ -52,7 +52,7 @@ app.add_middleware(
 
 @app.get("/")
 async def read_root():
-    return Response(status_code=200)
+    return Response("We are running", status_code=200)
 
 
 @app.get("/gwas")
@@ -61,49 +61,67 @@ async def gwas_endpoint(bt: BackgroundTasks):
     return Response("Triggered", status_code=200)
 
 
+@app.post("/candy/{file_id}")
+async def process_file(bt: BackgroundTasks, file_id: int):
+
     # Trigger background task to run the party
     print("hey yeeey")
-    # bt.add_task(magic, filename=filename)
+    bt.add_task(magic, file_id=file_id)
 
     return Response("Started", status_code=202)
 
 
-def magic(filename):
+def magic(file_id: int):
     # create all the stuff
 
-    print(f":::Starting the party - {datetime.now()}")
+    FILEPATH = f"../{file_id}.csv"
+    OUTPUT_PATH = f"../report_{file_id}.csv"
+    OUTPUT_TABLE = f"report{file_id}"
+    DB_FILE = f"db/{file_id}.db"
 
-    table_name = filename.split("/")[1][:-4]
+    stime = datetime.now()
+    print(f":::Starting the party")
 
-    print(f"building {table_name}")
+    print(f"building {file_id}")
 
-    snp = build_snp(filename)
+    b1 = datetime.now()
+    snp: SNPs = build_snp(FILEPATH)  # very slow. very very
+    print(f"snp built - {datetime.now()-b1}")
 
-    DB_FILE = f"tmpdb/{table_name}.db"
-    db = create_engine(f"sqlite:///{DB_FILE}")
+    db: Engine = create_engine(f"sqlite:///{DB_FILE}")
 
-    MYHERITAGE_TABLE = load_myheritage(db, snp)
+    m1 = datetime.now()
+    load_myheritage(db, snp)
+    print(f"SNP db loaded - {MYHERITAGE_TABLE} - {datetime.now()-m1}")
 
     # These two should be independent. DB should have this at startx
-    GWAS_TABLE = load_gwas(db)
-    # GENES_TABLE = load_genes(db)
+    g1 = datetime.now()
+    load_gwas(db)
+    print(f"GWAS loaded -{datetime.now()-g1}")
 
+    # g2 = datetime.now()
+    # GENES_TABLE = load_genes(db)
+    # print(f"GENES loaded -{datetime.now()-g2}")
     # join_genes(db, MYHERITAGE_TABLE, GENES_TABLE)
 
-    create_output(db, table_name, MYHERITAGE_TABLE, GWAS_TABLE)
+    o = datetime.now()
+    create_output(db, OUTPUT_TABLE)
+    print(f"Tables merged - {datetime.today()-o}")
 
-    generate_report(db, table_name, filename)
+    x = datetime.now()
+    generate_report(db, OUTPUT_TABLE, OUTPUT_PATH)
+    print(f"Report generated - {datetime.today()-x}")
 
-    print(filename)
-    print(f":::End of party - {datetime.now()}")
+    print(f":::End of party - {file_id} - {datetime.now()-stime}")
 
 
 def build_snp(fname):
-    snp = SNPs(fname)
+    snp = SNPs(fname)  # sometimes errors out with som pandas C errors?
 
     if not snp.valid or snp.source != "MyHeritage":
         raise Exception("Errors during build. DF not valid or myheritage")
 
+    # so slow. can we speed up remapping
     if snp.assembly != "GRCh38":
         print("Remapping to HRCh38")
         snp.remap(38)
@@ -111,18 +129,13 @@ def build_snp(fname):
 
 
 def load_myheritage(db, snp):
-    MYHERITAGE_TABLE = "myheritage"
     snp.snps[["chrom", "genotype"]] = snp.snps[["chrom", "genotype"]].astype("string")
     snp.snps.to_sql(MYHERITAGE_TABLE, db)
-    print(f"{MYHERITAGE_TABLE} imported!")
-    return MYHERITAGE_TABLE
 
 
 def load_gwas(db):
-    GWAS_FILE = "gwas_catalog_v1.0.2-associations_e100_r2021-05-19.tsv"
-    GWAS_TABLE = "gwas"
     gwas = pd.read_table(
-        GWAS_FILE,
+        GWAS_FILEPATH,
         dtype={
             "REPLICATION SAMPLE SIZE": "string",
             "CHR_POS": "string",
@@ -130,8 +143,6 @@ def load_gwas(db):
         },
     )
     gwas.to_sql(GWAS_TABLE, db)
-    print(f"{GWAS_TABLE} imported!")
-    return GWAS_TABLE
 
 
 def load_genes(db):
@@ -162,8 +173,8 @@ def join_genes(db, MYHERITAGE_TABLE, GENES_TABLE):
             SET gene = gen, geneName = genNa
             FROM (
                 SELECT rsid,`#geneName` AS gen, name AS genNa
-                FROM {MYHERITAGE_TABLE} 
-                    LEFT JOIN {GENES_TABLE} ON 
+                FROM {MYHERITAGE_TABLE}
+                    LEFT JOIN {GENES_TABLE} ON
                         {GENES_TABLE}.chrom = {MYHERITAGE_TABLE}.chrom
                         AND {MYHERITAGE_TABLE}.pos BETWEEN {GENES_TABLE}.txStart AND {GENES_TABLE}.txEnd
                 GROUP BY rsid) AS qquery
@@ -173,7 +184,7 @@ def join_genes(db, MYHERITAGE_TABLE, GENES_TABLE):
     print("genes added to myheritage table")
 
 
-def create_output(db, table_name, MYHERITAGE_TABLE, GWAS_TABLE):
+def create_output(db, table_name):
     db.execute(
         f"""
         CREATE TABLE {table_name} AS 
@@ -188,7 +199,7 @@ def create_output(db, table_name, MYHERITAGE_TABLE, GWAS_TABLE):
                 {GWAS_TABLE}.MAPPED_TRAIT                               AS study_mtrait, 
                 {GWAS_TABLE}.`DISEASE/TRAIT`                            AS study_trait,
                 {GWAS_TABLE}.STUDY                                      AS study_name,
-                {GWAS_TABLE}.link 
+                {GWAS_TABLE}.LINK 
         FROM {MYHERITAGE_TABLE} 
             LEFT JOIN {GWAS_TABLE} 
                 ON {MYHERITAGE_TABLE}.rsid = {GWAS_TABLE}.SNPS;"""
@@ -196,8 +207,6 @@ def create_output(db, table_name, MYHERITAGE_TABLE, GWAS_TABLE):
     # Can be added if genes are joined earlier
     # {MYHERITAGE_TABLE}.gene                                 AS gene,
     # {MYHERITAGE_TABLE}.geneName                             AS geneName,
-
-    print(f"{table_name} created")
 
 
 def generate_report(db, table_name, filename):
