@@ -27,19 +27,22 @@ app.get("/", (req, res) => {
 
 app.get("/result/:jobId", (req, res) => {
   // query for job id, return when ready
-  res.download("/Users/pablo.sanderson/repos/myheritage/fuploader/TODO");
+  res.download(`../reports/report_${req.params["jobId"]}.csv`, () => {
+    fs.unlink(`../reports/report_${req.params["jobId"]}.csv`, (err) => { console.error(err) });
+  });
+
 });
 
 let isready = false;
 app.get("/status/:jobId", (req, res) => {
-  // check work is ready, if not update field
-  // we could check in DB here if all chunks are there.
-  if (isready) {
-    res.status(200).send(`${HOST}/result/${req.params["jobId"]}`);
-  } else {
-    res.status(202).send("Not ready yet");
-    isready = true;
-  }
+  // check if file in  exists
+  fs.access(`../reports/report_${req.params["jobId"]}.csv`, fs.constants.F_OK, (err) => {
+    if (err) {
+      res.status(202).send("Not ready yet");
+    } else {
+      res.status(200).send(`${HOST}/result/${req.params["jobId"]}`);
+    }
+  })
 });
 
 app.post("/upload", async (req, res) => {
@@ -49,7 +52,7 @@ app.post("/upload", async (req, res) => {
   req.on("data", (chunk) => {
     // use chunk id to detect missing packets
     // this also ties data to the api. ideally we could send it to a DB? to consolidate the chunks later?
-    fs.appendFileSync(fileId + ".csv", chunk);
+    fs.appendFileSync("../uploads/" + fileId + ".csv", chunk);
     console.log(
       `rcv ${chunkId} out of ${total} - ${chunk.length} goes in ${fileId}`
     );
