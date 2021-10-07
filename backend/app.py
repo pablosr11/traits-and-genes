@@ -1,26 +1,3 @@
-"""
-- dont run genes and gwas every time. load from existing DB. 
-    - (dont create 309509 db, use one with GWAS, GENES preloaded. Create urSNP one,  )
-- include genes
-- from backgorund task to redis+rq (so we can do more than 1)
-
-# Given a myheritage.csv results file:
-- return known traits/studies for those rsids
-    - GET list of rsid from frontend, query database on backend. 
-- return set of GENES for the given rsids
-
-- DB stuff
-    - Full analysis of queries. Create index where apropiate
-        - Traits query SELECT * FROM WHERE rsid in (VERY LARGE). Temp table vs large in.
-        - Genes query
-    -
-
-    - speed up genes addition. index on positions or txstart/end?
-
-
-DOWNLOAD GWAS: https://www.ebi.ac.uk/gwas/docs/file-downloads
-
-"""
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -30,13 +7,14 @@ from snps import SNPs
 from sqlalchemy import create_engine
 from sqlalchemy.engine.base import Engine
 from starlette.responses import Response
+import os
 
 from urllib.request import urlretrieve
 
 GWAS_URL = "https://www.ebi.ac.uk/gwas/api/search/downloads/alternative"
-GWAS_FILEPATH = f"resources/gwas_{datetime.today().strftime('%d%m%Y')}.tsv"
-MYHERITAGE_TABLE = "myheritage"
+GWAS_FILEPATH = f"gwas_{datetime.today().strftime('%d%m%Y')}.tsv"
 GWAS_TABLE = "gwas"
+DB_URL = "sqlite:///main.db"
 
 app = FastAPI()
 origins = ["null"]
@@ -61,6 +39,12 @@ async def gwas_endpoint(bt: BackgroundTasks):
     return Response("Triggered", status_code=200)
 
 
+@app.get("/db")
+async def create_db(bt: BackgroundTasks):
+    bt.add_task(db_setup)
+    return Response("Triggered", status_code=200)
+
+
 @app.post("/candy/{file_id}")
 async def process_file(bt: BackgroundTasks, file_id: int):
 
@@ -69,6 +53,22 @@ async def process_file(bt: BackgroundTasks, file_id: int):
     bt.add_task(magic, file_id=file_id)
 
     return Response("Started", status_code=202)
+
+
+def db_setup():
+    # create db if not exist on url
+    db: Engine = create_engine(DB_URL)
+
+    # load gwas if not exists
+    # These two should be independent. DB should have this at startx
+    g1 = datetime.now()
+    load_gwas(db)
+    print(f"GWAS loaded - {datetime.now()-g1}")
+
+    # g2 = datetime.now()
+    # GENES_TABLE = load_genes(db)
+    # print(f"GENES loaded -{datetime.now()-g2}")
+    # join_genes(db, MYHERITAGE_TABLE, GENES_TABLE)
 
 
 def magic(file_id: int):
