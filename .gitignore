@@ -1,4 +1,5 @@
 resources/
 .vscode/
 *pycache*
-db/
+gwas**
+**.db
