@@ -74,10 +74,10 @@ def db_setup():
 def magic(file_id: int):
     # create all the stuff
 
-    FILEPATH = f"../{file_id}.csv"
-    OUTPUT_PATH = f"../report_{file_id}.csv"
+    FILEPATH = f"../uploads/{file_id}.csv"
+    DNA_TABLE = f"dna{file_id}"
+    OUTPUT_PATH = f"../reports/report_{file_id}.csv"
     OUTPUT_TABLE = f"report{file_id}"
-    DB_FILE = f"db/{file_id}.db"
 
     stime = datetime.now()
     print(f":::Starting the party")
@@ -85,38 +85,39 @@ def magic(file_id: int):
     print(f"building {file_id}")
 
     b1 = datetime.now()
-    snp: SNPs = build_snp(FILEPATH)  # very slow. very very
+    try:
+        snp: SNPs = build_snp(FILEPATH)  # very slow. very very
+    except Exception:
+        os.remove(FILEPATH)
+        raise Exception("error building snp")
     print(f"snp built - {datetime.now()-b1}")
 
-    db: Engine = create_engine(f"sqlite:///{DB_FILE}")
+    db: Engine = create_engine(DB_URL)
 
     m1 = datetime.now()
-    load_myheritage(db, snp)
-    print(f"SNP db loaded - {MYHERITAGE_TABLE} - {datetime.now()-m1}")
-
-    # These two should be independent. DB should have this at startx
-    g1 = datetime.now()
-    load_gwas(db)
-    print(f"GWAS loaded -{datetime.now()-g1}")
-
-    # g2 = datetime.now()
-    # GENES_TABLE = load_genes(db)
-    # print(f"GENES loaded -{datetime.now()-g2}")
-    # join_genes(db, MYHERITAGE_TABLE, GENES_TABLE)
+    load_myheritage(db, snp, DNA_TABLE)
+    print(f"SNP db loaded - {DNA_TABLE} - {datetime.now()-m1}")
 
     o = datetime.now()
-    create_output(db, OUTPUT_TABLE)
+    create_output(db, OUTPUT_TABLE, DNA_TABLE)
     print(f"Tables merged - {datetime.today()-o}")
 
     x = datetime.now()
     generate_report(db, OUTPUT_TABLE, OUTPUT_PATH)
     print(f"Report generated - {datetime.today()-x}")
 
+    # remove non-standard tables and files
+    os.remove(FILEPATH)
+    db.execute(f"""DROP TABLE {DNA_TABLE};""")
+    db.execute(f"""DROP TABLE {OUTPUT_TABLE};""")
+
     print(f":::End of party - {file_id} - {datetime.now()-stime}")
 
 
 def build_snp(fname):
     snp = SNPs(fname)  # sometimes errors out with som pandas C errors?
+    # exampleerror: ValueError: invalid literal for int() with base 10: 'GG'
+    # pandas.errors.ParserError: Error tokenizing data. C error: Expected 4 fields in line 413885, saw 6
 
     if not snp.valid or snp.source != "MyHeritage":
         raise Exception("Errors during build. DF not valid or myheritage")
@@ -128,9 +129,9 @@ def build_snp(fname):
     return snp
 
 
-def load_myheritage(db, snp):
+def load_myheritage(db, snp, table_name):
     snp.snps[["chrom", "genotype"]] = snp.snps[["chrom", "genotype"]].astype("string")
-    snp.snps.to_sql(MYHERITAGE_TABLE, db)
+    snp.snps.to_sql(table_name, db)
 
 
 def load_gwas(db):
@@ -142,7 +143,7 @@ def load_gwas(db):
             "SNP_ID_CURRENT": "string",
         },
     )
-    gwas.to_sql(GWAS_TABLE, db)
+    gwas.to_sql(GWAS_TABLE, db)  # if_exist=replace?
 
 
 def load_genes(db):
@@ -184,14 +185,14 @@ def join_genes(db, MYHERITAGE_TABLE, GENES_TABLE):
     print("genes added to myheritage table")
 
 
-def create_output(db, table_name):
+def create_output(db, table_name, dna_table):
     db.execute(
         f"""
         CREATE TABLE {table_name} AS 
-        SELECT {MYHERITAGE_TABLE}.rsid                                  AS rsid,
-                {MYHERITAGE_TABLE}.chrom                                AS chromosome,
-                {MYHERITAGE_TABLE}.pos                                  AS position,
-                {MYHERITAGE_TABLE}.genotype                             AS genotype,
+        SELECT {dna_table}.rsid                                  AS rsid,
+                {dna_table}.chrom                                AS chromosome,
+                {dna_table}.pos                                  AS position,
+                {dna_table}.genotype                             AS genotype,
                 {GWAS_TABLE}.`REPORTED GENE(S)`                         AS study_mgene,
                 {GWAS_TABLE}.MAPPED_GENE                                AS study_gene,
                 substr({GWAS_TABLE}.`STRONGEST SNP-RISK ALLELE`,-1)     AS study_allele,
@@ -200,13 +201,13 @@ def create_output(db, table_name):
                 {GWAS_TABLE}.`DISEASE/TRAIT`                            AS study_trait,
                 {GWAS_TABLE}.STUDY                                      AS study_name,
                 {GWAS_TABLE}.LINK 
-        FROM {MYHERITAGE_TABLE} 
+        FROM {dna_table} 
             LEFT JOIN {GWAS_TABLE} 
-                ON {MYHERITAGE_TABLE}.rsid = {GWAS_TABLE}.SNPS;"""
+                ON {dna_table}.rsid = {GWAS_TABLE}.SNPS;"""
     )
     # Can be added if genes are joined earlier
-    # {MYHERITAGE_TABLE}.gene                                 AS gene,
-    # {MYHERITAGE_TABLE}.geneName                             AS geneName,
+    # {dna_table}.gene                                 AS gene,
+    # {dna_table}.geneName                             AS geneName,
 
 
 def generate_report(db, table_name, filename):
