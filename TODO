@@ -1,0 +1,31 @@
+TODO
+
+- include genes
+- remove non-trait entries?
+- from backgorund task to redis+rq (so we can do more than 1)
+- run multiple times, check error handling
+- switch db to multiple concurrent connections (pool pg)
+- refactor
+- deploy
+
+
+HOW TO RUN:
+uvicorn app:app
+yarn build && yarn run start
+
+
+DOWNLOAD GWAS: https://www.ebi.ac.uk/gwas/docs/file-download
+
+\\\\\\\\\\\\\\\\\\\
+POC:
+User uploads a file (and a password?)
+Gets a link to download the file when its ready
+
+The backend receives the file
+Process it (appends whatever is necessary)
+Makes it available for download on the specified link (with a password?)
+\\\\\\\\\\\\\\\\\\\
+
+
+
+
