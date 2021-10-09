@@ -65,11 +65,6 @@ def db_setup():
     load_gwas(db)
     print(f"GWAS loaded - {datetime.now()-g1}")
 
-    # g2 = datetime.now()
-    # GENES_TABLE = load_genes(db)
-    # print(f"GENES loaded -{datetime.now()-g2}")
-    # join_genes(db, MYHERITAGE_TABLE, GENES_TABLE)
-
 
 def magic(file_id: int):
     # create all the stuff
@@ -146,45 +141,6 @@ def load_gwas(db):
     gwas.to_sql(GWAS_TABLE, db)  # if_exist=replace?
 
 
-def load_genes(db):
-    GENES_FILE = "geneshg38.tsv"
-    GENES_TABLE = "genes"
-    genes = pd.read_table(GENES_FILE)
-    # Get rid of additional info. chrY_randomfix -> Y
-    genes.chrom = genes.chrom.str.replace(
-        r"(.*)(chr[a-zA-Z0-9]{1,2})(.*)", lambda x: x.group(2)[3:], regex=True
-    )
-    genes[["#geneName", "name", "chrom", "strand"]] = genes[
-        ["#geneName", "name", "chrom", "strand"]
-    ].astype("string")
-    genes[["txStart", "txEnd", "cdsStart", "cdsEnd", "exonCount"]] = genes[
-        ["txStart", "txEnd", "cdsStart", "cdsEnd", "exonCount"]
-    ].astype("int32")
-    genes.to_sql(GENES_TABLE, db)
-    print(f"{GENES_TABLE} imported!")
-    return GENES_TABLE
-
-
-def join_genes(db, MYHERITAGE_TABLE, GENES_TABLE):
-    db.execute(f"""ALTER TABLE {MYHERITAGE_TABLE} ADD COLUMN gene text;""")
-    db.execute(f"""ALTER TABLE {MYHERITAGE_TABLE} ADD COLUMN geneName text;""")
-    db.execute(
-        f"""
-            UPDATE {MYHERITAGE_TABLE}
-            SET gene = gen, geneName = genNa
-            FROM (
-                SELECT rsid,`#geneName` AS gen, name AS genNa
-                FROM {MYHERITAGE_TABLE}
-                    LEFT JOIN {GENES_TABLE} ON
-                        {GENES_TABLE}.chrom = {MYHERITAGE_TABLE}.chrom
-                        AND {MYHERITAGE_TABLE}.pos BETWEEN {GENES_TABLE}.txStart AND {GENES_TABLE}.txEnd
-                GROUP BY rsid) AS qquery
-            WHERE {MYHERITAGE_TABLE}.rsid = qquery.rsid;
-        """
-    )
-    print("genes added to myheritage table")
-
-
 def create_output(db, table_name, dna_table):
     db.execute(
         f"""
@@ -205,9 +161,6 @@ def create_output(db, table_name, dna_table):
             LEFT JOIN {GWAS_TABLE} 
                 ON {dna_table}.rsid = {GWAS_TABLE}.SNPS;"""
     )
-    # Can be added if genes are joined earlier
-    # {dna_table}.gene                                 AS gene,
-    # {dna_table}.geneName                             AS geneName,
 
 
 def generate_report(db, table_name, filename):
