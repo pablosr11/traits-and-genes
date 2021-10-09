@@ -1,12 +1,13 @@
 TODO
 
-- include genes
-- remove non-trait entries?
 - from backgorund task to redis+rq (so we can do more than 1)
 - run multiple times, check error handling
 - switch db to multiple concurrent connections (pool pg)
 - refactor
+- double check SQL. we mighr have duplicates, currently using distinct as workaround
 - deploy
+
+https://genome.ucsc.edu/cgi-bin/hgTables?db=hg38&hgta_group=genes&hgta_track=refSeqComposite&hgta_table=ncbiRefSeqCurated&hgta_doSchema=describe+table+schema
 
 
 HOW TO RUN:

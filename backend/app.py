@@ -49,7 +49,6 @@ async def create_db(bt: BackgroundTasks):
 async def process_file(bt: BackgroundTasks, file_id: int):
 
     # Trigger background task to run the party
-    print("hey yeeey")
     bt.add_task(magic, file_id=file_id)
 
     return Response("Started", status_code=202)
@@ -145,7 +144,7 @@ def create_output(db, table_name, dna_table):
     db.execute(
         f"""
         CREATE TABLE {table_name} AS 
-        SELECT {dna_table}.rsid                                  AS rsid,
+        SELECT DISTINCT {dna_table}.rsid                                  AS rsid,
                 {dna_table}.chrom                                AS chromosome,
                 {dna_table}.pos                                  AS position,
                 {dna_table}.genotype                             AS genotype,
@@ -159,7 +158,8 @@ def create_output(db, table_name, dna_table):
                 {GWAS_TABLE}.LINK 
         FROM {dna_table} 
             LEFT JOIN {GWAS_TABLE} 
-                ON {dna_table}.rsid = {GWAS_TABLE}.SNPS;"""
+                ON {dna_table}.rsid = {GWAS_TABLE}.SNPS
+        WHERE {GWAS_TABLE}.MAPPED_TRAIT IS NOT NULL;"""
     )
 
 
