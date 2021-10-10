@@ -54,19 +54,13 @@ async def process_file(bt: BackgroundTasks, file_id: int):
     return Response("Started", status_code=202)
 
 
-def database_setup():
-    # create db if not exist on url
-    db: Engine = create_engine(DATABASE_URL)  
-
-    # load gwas if not exists
-    # These two should be independent. DB should have this at startx
+def database_setup() -> None:
     g1 = datetime.now()
-    load_gwas(db)
+    load_gwas()
     print(f"GWAS loaded - {datetime.now()-g1}")
 
 
-def magic(file_id: int):
-    # create all the stuff
+def magic(file_id: int) -> None:
 
     FILEPATH = f"../uploads/{file_id}.csv"
     DNA_TABLE = f"dna{file_id}"
@@ -81,23 +75,23 @@ def magic(file_id: int):
     b1 = datetime.now()
     try:
         snp: SNPs = build_snp(FILEPATH)  # very slow. very very
-    except Exception:
+    except Exception as err:
         os.remove(FILEPATH)
-        raise Exception("error building snp")
+        raise Exception(err)
     print(f"snp built - {datetime.now()-b1}")
 
     db: Engine = create_engine(DATABASE_URL)  
 
     m1 = datetime.now()
-    load_myheritage(db, snp, DNA_TABLE)
+    load_myheritage(snp, DNA_TABLE)
     print(f"SNP database loaded - {DNA_TABLE} - {datetime.now()-m1}")
 
     o = datetime.now()
-    create_output(db, OUTPUT_TABLE, DNA_TABLE)
+    create_output(OUTPUT_TABLE, DNA_TABLE)
     print(f"Tables merged - {datetime.today()-o}")
 
     x = datetime.now()
-    generate_report(db, OUTPUT_TABLE, OUTPUT_PATH)
+    generate_report(OUTPUT_TABLE, OUTPUT_PATH)
     print(f"Report generated - {datetime.today()-x}")
 
     # remove non-standard tables and files
@@ -108,7 +102,7 @@ def magic(file_id: int):
     print(f":::End of party - {file_id} - {datetime.now()-stime}")
 
 
-def build_snp(fname):
+def build_snp(fname: str) -> SNPs:
     snp = SNPs(fname)  # sometimes errors out with som pandas C errors?
     # exampleerror: ValueError: invalid literal for int() with base 10: 'GG'
     # pandas.errors.ParserError: Error tokenizing data. C error: Expected 4 fields in line 413885, saw 6
@@ -123,12 +117,12 @@ def build_snp(fname):
     return snp
 
 
-def load_myheritage(db, snp, table_name):
+def load_myheritage(snp: SNPs, table_name: str) -> None:
     snp.snps[["chrom", "genotype"]] = snp.snps[["chrom", "genotype"]].astype("string")
     snp.snps.to_sql(table_name, db)
 
 
-def load_gwas(db):
+def load_gwas() -> None:
     gwas = pd.read_table(
         GWAS_FILEPATH,
         dtype={
@@ -140,8 +134,7 @@ def load_gwas(db):
     gwas.to_sql(GWAS_TABLE, db)  # if_exist=replace?
 
 
-def create_output(db, table_name, dna_table):
-    db.execute(
+def create_output(table_name: str, dna_table: str) -> None:
         f"""
         CREATE TABLE {table_name} AS 
         SELECT DISTINCT {dna_table}.rsid                                  AS rsid,
@@ -163,6 +156,5 @@ def create_output(db, table_name, dna_table):
     )
 
 
-def generate_report(db, table_name, filename):
-    df = pd.read_sql_table(table_name, db)
+def generate_report(table_name: str, filename: str) -> None:
     df.to_csv(filename)
