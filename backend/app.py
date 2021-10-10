@@ -14,7 +14,7 @@ from urllib.request import urlretrieve
 GWAS_URL = "https://www.ebi.ac.uk/gwas/api/search/downloads/alternative"
 GWAS_FILEPATH = f"gwas_{datetime.today().strftime('%d%m%Y')}.tsv"
 GWAS_TABLE = "gwas"
-DB_URL = "sqlite:///main.db"
+DATABASE_URL = "sqlite:///main.db" 
 
 app = FastAPI()
 origins = ["null"]
@@ -39,9 +39,9 @@ async def gwas_endpoint(bt: BackgroundTasks):
     return Response("Triggered", status_code=200)
 
 
-@app.get("/db")
-async def create_db(bt: BackgroundTasks):
-    bt.add_task(db_setup)
+@app.get("/setup")
+async def setup_database(bt: BackgroundTasks):
+    bt.add_task(database_setup)
     return Response("Triggered", status_code=200)
 
 
@@ -54,9 +54,9 @@ async def process_file(bt: BackgroundTasks, file_id: int):
     return Response("Started", status_code=202)
 
 
-def db_setup():
+def database_setup():
     # create db if not exist on url
-    db: Engine = create_engine(DB_URL)
+    db: Engine = create_engine(DATABASE_URL)  
 
     # load gwas if not exists
     # These two should be independent. DB should have this at startx
@@ -86,11 +86,11 @@ def magic(file_id: int):
         raise Exception("error building snp")
     print(f"snp built - {datetime.now()-b1}")
 
-    db: Engine = create_engine(DB_URL)
+    db: Engine = create_engine(DATABASE_URL)  
 
     m1 = datetime.now()
     load_myheritage(db, snp, DNA_TABLE)
-    print(f"SNP db loaded - {DNA_TABLE} - {datetime.now()-m1}")
+    print(f"SNP database loaded - {DNA_TABLE} - {datetime.now()-m1}")
 
     o = datetime.now()
     create_output(db, OUTPUT_TABLE, DNA_TABLE)
