@@ -68,6 +68,7 @@ app.post("/upload", async (req, res) => {
   if (chunkId === total) {
     console.log(`Upload completed: ${fileId}`);
     // trigger background job with ID fileId.
+    // node blows up if backend is disconnected.
     await axios.post(`http://localhost:8000/candy/${fileId}`);
     res.status(200).send(`${HOST}/status/${fileId}`);
   } else {
