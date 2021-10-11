@@ -12,12 +12,14 @@ import os
 from urllib.request import urlretrieve
 
 GWAS_URL = "https://www.ebi.ac.uk/gwas/api/search/downloads/alternative"
-GWAS_FILEPATH = f"gwas_{datetime.today().strftime('%d%m%Y')}.tsv"
+GWAS_FILEPATH = f"gwas_catalog.tsv"
 GWAS_TABLE = "gwas"
-DATABASE_URL = "sqlite:///main.db" 
+DB_URL = "postgresql://ps@localhost:5432/dna"
 
 app = FastAPI()
 origins = ["null"]
+db: Engine = create_engine(DB_URL, poolclass=QueuePool)
+pool: QueuePool = db.pool
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,11 +32,17 @@ app.add_middleware(
 
 @app.get("/")
 async def read_root():
-    return Response("We are running", status_code=200)
+    print(pool.status())
+    return Response(
+        f"We are running - {pool.size()} - {pool.overflow()} - {pool.checkedout()}",
+        status_code=200,
+    )
 
 
 @app.get("/gwas")
 async def gwas_endpoint(bt: BackgroundTasks):
+    # issue with new line at EOF
+    # issue with lines getting split up 187218
     bt.add_task(urlretrieve, url=GWAS_URL, filename=GWAS_FILEPATH)
     return Response("Triggered", status_code=200)
 
@@ -56,15 +64,23 @@ async def process_file(bt: BackgroundTasks, file_id: int):
 
 def database_setup() -> None:
     g1 = datetime.now()
-    load_gwas()
+
+    conn = pool.connect()
+    cur = conn.cursor()
+    with open("/Users/ps/repos/traits-and-genes/backend/test.sql") as fcreate:
+        cur.execute(fcreate.read())
+    with open("/Users/ps/repos/traits-and-genes/backend/gwas_catalog.tsv") as fpopulate:
+        cur.copy_from(fpopulate, "gwas")
+    conn.commit()
+    conn.close()
     print(f"GWAS loaded - {datetime.now()-g1}")
 
 
 def magic(file_id: int) -> None:
 
-    FILEPATH = f"../uploads/{file_id}.csv"
+    FILEPATH = f"/Users/ps/repos/traits-and-genes/uploads/{file_id}.csv"
     DNA_TABLE = f"dna{file_id}"
-    OUTPUT_PATH = f"../reports/report_{file_id}.csv"
+    OUTPUT_PATH = f"/Users/ps/repos/traits-and-genes/report_{file_id}.csv"
     OUTPUT_TABLE = f"report{file_id}"
 
     stime = datetime.now()
@@ -77,7 +93,7 @@ def magic(file_id: int) -> None:
         snp: SNPs = build_snp(FILEPATH)  # very slow. very very
     except Exception as err:
         os.remove(FILEPATH)
-        raise Exception(err)
+        raise err
     print(f"snp built - {datetime.now()-b1}")
 
     db: Engine = create_engine(DATABASE_URL)  
