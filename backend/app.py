@@ -6,6 +6,7 @@ from fastapi import BackgroundTasks, FastAPI
 from snps import SNPs
 from sqlalchemy import create_engine
 from sqlalchemy.engine.base import Engine
+from sqlalchemy.pool.impl import QueuePool
 from starlette.responses import Response
 import os
 
@@ -98,6 +99,7 @@ def magic(file_id: int) -> None:
 
     m1 = datetime.now()
     load_myheritage(snp, DNA_TABLE)
+    del snp
     print(f"SNP database loaded - {DNA_TABLE} - {datetime.now()-m1}")
 
     o = datetime.now()
@@ -110,15 +112,20 @@ def magic(file_id: int) -> None:
 
     # remove non-standard tables and files
     os.remove(FILEPATH)
-    db.execute(f"""DROP TABLE {DNA_TABLE};""")
-    db.execute(f"""DROP TABLE {OUTPUT_TABLE};""")
+
+    conn = pool.connect()
+    cur = conn.cursor()
+    cur.execute(f"""DROP TABLE {DNA_TABLE};""")
+    cur.execute(f"""DROP TABLE {OUTPUT_TABLE};""")
+    conn.commit()
+    conn.close()
 
     print(f":::End of party - {file_id} - {datetime.now()-stime}")
 
 
 def build_snp(fname: str) -> SNPs:
     try:
-    snp = SNPs(fname)  # sometimes errors out with som pandas C errors?
+        snp = SNPs(fname)  # sometimes errors out with som pandas C errors?
     except Exception as err:
         raise err
     # exampleerror: ValueError: invalid literal for int() with base 10: 'GG'
@@ -148,8 +155,8 @@ def load_myheritage(snp: SNPs, table_name: str) -> None:
         create table {table_name} (
             rsid varchar,
             chrom varchar,
-            position varchar,
-            result varchar
+            pos varchar,
+            genotype varchar
     );"""
     )
     with open(filename) as f:
@@ -161,26 +168,38 @@ def load_myheritage(snp: SNPs, table_name: str) -> None:
 
 
 def create_output(table_name: str, dna_table: str) -> None:
+
+    conn = pool.connect()
+    cur = conn.cursor()
+
+    cur.execute(
         f"""
         CREATE TABLE {table_name} AS 
         SELECT DISTINCT {dna_table}.rsid                                  AS rsid,
                 {dna_table}.chrom                                AS chromosome,
                 {dna_table}.pos                                  AS position,
                 {dna_table}.genotype                             AS genotype,
-                {GWAS_TABLE}.`REPORTED GENE(S)`                         AS study_mgene,
-                {GWAS_TABLE}.MAPPED_GENE                                AS study_gene,
-                substr({GWAS_TABLE}.`STRONGEST SNP-RISK ALLELE`,-1)     AS study_allele,
-                {GWAS_TABLE}.DATE                                       AS study_date,
-                {GWAS_TABLE}.MAPPED_TRAIT                               AS study_mtrait, 
-                {GWAS_TABLE}.`DISEASE/TRAIT`                            AS study_trait,
-                {GWAS_TABLE}.STUDY                                      AS study_name,
-                {GWAS_TABLE}.LINK 
+                {GWAS_TABLE}."REPORTED GENE(S)"                         AS study_mgene,
+                {GWAS_TABLE}."MAPPED_GENE"                                AS study_gene,
+                substr({GWAS_TABLE}."STRONGEST SNP-RISK ALLELE",-1)     AS study_allele,
+                {GWAS_TABLE}."DATE"                                       AS study_date,
+                {GWAS_TABLE}."MAPPED_TRAIT"                               AS study_mtrait, 
+                {GWAS_TABLE}."DISEASE/TRAIT"                            AS study_trait,
+                {GWAS_TABLE}."STUDY"                                      AS study_name,
+                {GWAS_TABLE}."LINK" 
         FROM {dna_table} 
             LEFT JOIN {GWAS_TABLE} 
-                ON {dna_table}.rsid = {GWAS_TABLE}.SNPS
-        WHERE {GWAS_TABLE}.MAPPED_TRAIT IS NOT NULL;"""
+                ON {dna_table}.rsid = {GWAS_TABLE}."SNPS"
+        WHERE {GWAS_TABLE}."MAPPED_TRAIT" IS NOT NULL;"""
     )
+
+    conn.commit()
+    conn.close()
 
 
 def generate_report(table_name: str, filename: str) -> None:
-    df.to_csv(filename)
+    conn = pool.connect()
+    cur = conn.cursor()
+    with open(filename, "w") as f:
+        cur.copy_to(f, table_name, sep=",")
+    conn.close()
