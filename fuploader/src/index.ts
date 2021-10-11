@@ -29,8 +29,8 @@ app.get("/", (req, res) => {
 app.get("/result/:jobId", (req, res) => {
   // when rest of api has the storage decoupled, we should pull the file from the file storage directly.
   // this endpoint might not even exist as frontend can diwnload from s3
-  res.download(`../reports/report_${req.params["jobId"]}.csv`, () => {
-    fs.unlink(`../reports/report_${req.params["jobId"]}.csv`, (err) => { console.error(err) });
+  res.download(`/Users/ps/repos/traits-and-genes/reports/report_${req.params["jobId"]}.csv`, () => {
+    fs.unlink(`/Users/ps/repos/traits-and-genes/reports/report_${req.params["jobId"]}.csv`, (err) => { console.error(err) });
   });
 
 });
@@ -39,7 +39,7 @@ app.get("/status/:jobId", (req, res) => {
   // check if results file in  exists
   // this couples the state to the API. Ideally we check against the matching service status api
   // when processing is ready, download directly from file storage (s3 or whatever)
-  fs.access(`../reports/report_${req.params["jobId"]}.csv`, fs.constants.F_OK, (err) => {
+  fs.access(`/Users/ps/repos/traits-and-genes/reports/report_${req.params["jobId"]}.csv`, fs.constants.F_OK, (err) => {
     if (err) {
       res.status(202).send("Not ready yet");
     } else {
@@ -57,7 +57,7 @@ app.post("/upload", async (req, res) => {
     // use chunk id to detect missing packets
     // this ties data to the api. ideally we could send it to a DB with fileid, chunkid and totalchunk.
     // and consolidate it later.
-    fs.appendFileSync("../uploads/" + fileId + ".csv", chunk);
+    fs.appendFileSync("/Users/ps/repos/traits-and-genes/uploads/" + fileId + ".csv", chunk);
     console.log(
       `rcv ${chunkId} out of ${total} - ${chunk.length} goes in ${fileId}`
     );
