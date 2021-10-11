@@ -19,7 +19,8 @@ DB_URL = "postgresql://ps@localhost:5432/dna"
 
 app = FastAPI()
 origins = ["null"]
-db: Engine = create_engine(DB_URL, poolclass=QueuePool)
+# how many connections (max users * connections used by user(3-4?)). Check postgres.
+db: Engine = create_engine(DB_URL, poolclass=QueuePool, pool_size=20)
 pool: QueuePool = db.pool
 
 app.add_middleware(
