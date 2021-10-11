@@ -96,8 +96,6 @@ def magic(file_id: int) -> None:
         raise err
     print(f"snp built - {datetime.now()-b1}")
 
-    db: Engine = create_engine(DATABASE_URL)  
-
     m1 = datetime.now()
     load_myheritage(snp, DNA_TABLE)
     print(f"SNP database loaded - {DNA_TABLE} - {datetime.now()-m1}")
@@ -119,7 +117,10 @@ def magic(file_id: int) -> None:
 
 
 def build_snp(fname: str) -> SNPs:
+    try:
     snp = SNPs(fname)  # sometimes errors out with som pandas C errors?
+    except Exception as err:
+        raise err
     # exampleerror: ValueError: invalid literal for int() with base 10: 'GG'
     # pandas.errors.ParserError: Error tokenizing data. C error: Expected 4 fields in line 413885, saw 6
 
@@ -135,19 +136,28 @@ def build_snp(fname: str) -> SNPs:
 
 def load_myheritage(snp: SNPs, table_name: str) -> None:
     snp.snps[["chrom", "genotype"]] = snp.snps[["chrom", "genotype"]].astype("string")
-    snp.snps.to_sql(table_name, db)
+    filename = f"/Users/ps/repos/traits-and-genes/backend/{table_name}.csv"
 
+    # issue: pandas default to sqlite when using DBAPI 2.0. we will write to CSV and load that to psql
+    snp.snps.to_csv(filename)
 
-def load_gwas() -> None:
-    gwas = pd.read_table(
-        GWAS_FILEPATH,
-        dtype={
-            "REPLICATION SAMPLE SIZE": "string",
-            "CHR_POS": "string",
-            "SNP_ID_CURRENT": "string",
-        },
+    conn = pool.connect()
+    cur = conn.cursor()
+    cur.execute(
+        f"""
+        create table {table_name} (
+            rsid varchar,
+            chrom varchar,
+            position varchar,
+            result varchar
+    );"""
     )
-    gwas.to_sql(GWAS_TABLE, db)  # if_exist=replace?
+    with open(filename) as f:
+        cur.copy_from(file=f, table=table_name, sep=",")
+    conn.commit()
+    conn.close()
+
+    os.remove(filename)
 
 
 def create_output(table_name: str, dna_table: str) -> None:
