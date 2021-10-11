@@ -203,4 +203,6 @@ def generate_report(table_name: str, filename: str) -> None:
     cur = conn.cursor()
     with open(filename, "w") as f:
         cur.copy_to(f, table_name, sep=",")
+    cur.execute(f"""DROP TABLE {table_name}""")
+    conn.commit()
     conn.close()
