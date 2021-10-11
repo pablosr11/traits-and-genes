@@ -113,10 +113,11 @@ def magic(file_id: int) -> None:
 
     # remove non-standard tables and files
     os.remove(FILEPATH)
+    os.remove(OUTPUT_PATH)
 
     conn = pool.connect()
     cur = conn.cursor()
-    cur.execute(f"""DROP TABLE {DNA_TABLE};""")
+
     cur.execute(f"""DROP TABLE {OUTPUT_TABLE};""")
     conn.commit()
     conn.close()
@@ -203,6 +204,4 @@ def generate_report(table_name: str, filename: str) -> None:
     cur = conn.cursor()
     with open(filename, "w") as f:
         cur.copy_to(f, table_name, sep=",")
-    cur.execute(f"""DROP TABLE {table_name}""")
-    conn.commit()
     conn.close()

@@ -1,12 +1,22 @@
 TODO
 
+- DB setup.
+    - ADD PASSWORD TO DB. Store in env
+    - reorganize connection+cursor+commit etc
 - dockerise + automate deployment
-- switch db to multiple concurrent connections (pool pg)
+    - nginx serving html and client js, proxy request to node
+    - node backend to interact with frontend and matching service
+    - matching service api
+    - single postgres database 
+- deploy in EC2 AWS? (later do container based/serverless. rethink.)
+- automate infra with Terra
 - from backgorund task to redis+rq (so we can do more than 1)
-- run multiple times, check error handling
-- refactor
+    - do it lightweight. can we do threads and check their status?
+- refactor (run multiple times, check error handling)
+    - 1 smoke test for full system. 1 smoke test for each api E2E.
 - double check SQL. we mighr have duplicates, currently using distinct as workaround
-- deploy AWS?
+- deploy as containers AWS - closer to "serverless"
+- store files in database on upload to have stateless node backend
 
 https://genome.ucsc.edu/cgi-bin/hgTables?db=hg38&hgta_group=genes&hgta_track=refSeqComposite&hgta_table=ncbiRefSeqCurated&hgta_doSchema=describe+table+schema
 
