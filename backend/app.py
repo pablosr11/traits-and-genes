@@ -82,7 +82,7 @@ def magic(file_id: int) -> None:
 
     FILEPATH = f"/Users/ps/repos/traits-and-genes/uploads/{file_id}.csv"
     DNA_TABLE = f"dna{file_id}"
-    OUTPUT_PATH = f"/Users/ps/repos/traits-and-genes/report_{file_id}.csv"
+    OUTPUT_PATH = f"/Users/ps/repos/traits-and-genes/reports/report_{file_id}.csv"
     OUTPUT_TABLE = f"report{file_id}"
 
     stime = datetime.now()
