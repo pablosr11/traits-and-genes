@@ -35,6 +35,13 @@ db = psycopg2.pool.ThreadedConnectionPool(
     port=env.get("DB_PORT"),
 )
 
+try:
+    db.getconn().cursor().execute("SELECT 1;")
+except Exception as err:
+    # hide credentials
+    raise Exception("Couldnt connect with the DB. Review credentials")
+
+
 @app.get("/")
 async def read_root():
     return Response(
