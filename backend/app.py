@@ -125,7 +125,6 @@ def magic(file_id: int) -> None:
 
     # remove non-standard tables and files
     os.remove(FILEPATH)
-    os.remove(OUTPUT_PATH)
 
     with db.getconn() as conn:
         with conn.cursor() as cur:
