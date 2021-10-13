@@ -37,9 +37,8 @@ db = psycopg2.pool.ThreadedConnectionPool(
 
 @app.get("/")
 async def read_root():
-    print(pool.status())
     return Response(
-        f"We are running - {pool.size()} - {pool.overflow()} - {pool.checkedout()}",
+        f"We are running",
         status_code=200,
     )
 
@@ -70,13 +69,16 @@ async def process_file(bt: BackgroundTasks, file_id: int):
 def database_setup() -> None:
     g1 = datetime.now()
 
-    conn = pool.connect()
-    cur = conn.cursor()
-    with open("/Users/ps/repos/traits-and-genes/backend/test.sql") as fcreate:
-        cur.execute(fcreate.read())
-    with open("/Users/ps/repos/traits-and-genes/backend/gwas_catalog.tsv") as fpopulate:
-        cur.copy_from(fpopulate, "gwas")
-    conn.commit()
+    with db.getconn() as conn:
+        with conn.cursor() as cur:
+            with open("/Users/ps/repos/traits-and-genes/backend/test.sql") as fcreate:
+                cur.execute(fcreate.read())
+            with open(
+                "/Users/ps/repos/traits-and-genes/backend/gwas_catalog.tsv"
+            ) as fpopulate:
+                cur.copy_from(fpopulate, "gwas")
+
+    # leaving contexts doesn't close the connection
     conn.close()
     print(f"GWAS loaded - {datetime.now()-g1}")
 
@@ -118,11 +120,11 @@ def magic(file_id: int) -> None:
     os.remove(FILEPATH)
     os.remove(OUTPUT_PATH)
 
-    conn = pool.connect()
-    cur = conn.cursor()
+    with db.getconn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(f"""DROP TABLE {OUTPUT_TABLE};""")
 
-    cur.execute(f"""DROP TABLE {OUTPUT_TABLE};""")
-    conn.commit()
+    # leaving contexts doesn't close the connection
     conn.close()
 
     print(f":::End of party - {file_id} - {datetime.now()-stime}")
@@ -153,58 +155,55 @@ def load_myheritage(snp: SNPs, table_name: str) -> None:
     # issue: pandas default to sqlite when using DBAPI 2.0. we will write to CSV and load that to psql
     snp.snps.to_csv(filename)
 
-    conn = pool.connect()
-    cur = conn.cursor()
-    cur.execute(
-        f"""
-        create table {table_name} (
-            rsid varchar,
-            chrom varchar,
-            pos varchar,
-            genotype varchar
-    );"""
-    )
-    with open(filename) as f:
-        cur.copy_from(file=f, table=table_name, sep=",")
-    conn.commit()
-    conn.close()
+    with db.getconn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""
+                    create table {table_name} (
+                        rsid varchar,
+                        chrom varchar,
+                        pos varchar,
+                        genotype varchar
+                );"""
+            )
+            with open(filename) as f:
+                cur.copy_from(file=f, table=table_name, sep=",")
 
+    # leaving contexts doesn't close the connection
+    conn.close()
     os.remove(filename)
 
 
 def create_output(table_name: str, dna_table: str) -> None:
 
-    conn = pool.connect()
-    cur = conn.cursor()
-
-    cur.execute(
-        f"""
-        CREATE TABLE {table_name} AS 
-        SELECT DISTINCT {dna_table}.rsid                                  AS rsid,
-                {dna_table}.chrom                                AS chromosome,
-                {dna_table}.pos                                  AS position,
-                {dna_table}.genotype                             AS genotype,
-                {GWAS_TABLE}."REPORTED GENE(S)"                         AS study_mgene,
-                {GWAS_TABLE}."MAPPED_GENE"                                AS study_gene,
-                substr({GWAS_TABLE}."STRONGEST SNP-RISK ALLELE",-1)     AS study_allele,
-                {GWAS_TABLE}."DATE"                                       AS study_date,
-                {GWAS_TABLE}."MAPPED_TRAIT"                               AS study_mtrait, 
-                {GWAS_TABLE}."DISEASE/TRAIT"                            AS study_trait,
-                {GWAS_TABLE}."STUDY"                                      AS study_name,
-                {GWAS_TABLE}."LINK" 
-        FROM {dna_table} 
-            LEFT JOIN {GWAS_TABLE} 
-                ON {dna_table}.rsid = {GWAS_TABLE}."SNPS"
-        WHERE {GWAS_TABLE}."MAPPED_TRAIT" IS NOT NULL;"""
-    )
-
-    conn.commit()
+    with db.getconn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""
+                CREATE TABLE {table_name} AS 
+                SELECT DISTINCT {dna_table}.rsid                                  AS rsid,
+                        {dna_table}.chrom                                AS chromosome,
+                        {dna_table}.pos                                  AS position,
+                        {dna_table}.genotype                             AS genotype,
+                        {GWAS_TABLE}."REPORTED GENE(S)"                         AS study_mgene,
+                        {GWAS_TABLE}."MAPPED_GENE"                                AS study_gene,
+                        substr({GWAS_TABLE}."STRONGEST SNP-RISK ALLELE",-1)     AS study_allele,
+                        {GWAS_TABLE}."DATE"                                       AS study_date,
+                        {GWAS_TABLE}."MAPPED_TRAIT"                               AS study_mtrait, 
+                        {GWAS_TABLE}."DISEASE/TRAIT"                            AS study_trait,
+                        {GWAS_TABLE}."STUDY"                                      AS study_name,
+                        {GWAS_TABLE}."LINK" 
+                FROM {dna_table} 
+                    LEFT JOIN {GWAS_TABLE} 
+                        ON {dna_table}.rsid = {GWAS_TABLE}."SNPS"
+                WHERE {GWAS_TABLE}."MAPPED_TRAIT" IS NOT NULL;"""
+            )
     conn.close()
 
 
 def generate_report(table_name: str, filename: str) -> None:
-    conn = pool.connect()
-    cur = conn.cursor()
-    with open(filename, "w") as f:
-        cur.copy_to(f, table_name, sep=",")
+    with db.getconn() as conn:
+        with conn.cursor() as cur:
+            with open(filename, "w") as f:
+                cur.copy_to(f, table_name, sep=",")
     conn.close()
