@@ -3,3 +3,4 @@ resources/
 *pycache*
 gwas**
 **.db
+.env
