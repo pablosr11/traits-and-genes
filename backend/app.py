@@ -35,8 +35,16 @@ db = psycopg2.pool.ThreadedConnectionPool(
     port=env.get("DB_PORT"),
 )
 
+
+def db_execute(statement: str):
+    with db.getconn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(statement)
+    conn.close()
+
+
 try:
-    db.getconn().cursor().execute("SELECT 1;")
+    db_execute("SELECT 1;")
 except Exception as err:
     # hide credentials
     raise Exception("Couldnt connect with the DB. Review credentials")
@@ -52,8 +60,6 @@ async def read_root():
 
 @app.get("/gwas")
 async def gwas_endpoint(bt: BackgroundTasks):
-    # issue with new line at EOF
-    # issue with lines getting split up 187218
     bt.add_task(urlretrieve, url=GWAS_URL, filename=GWAS_FILEPATH)
     return Response("Triggered", status_code=200)
 
@@ -66,26 +72,22 @@ async def setup_database(bt: BackgroundTasks):
 
 @app.post("/candy/{file_id}")
 async def process_file(bt: BackgroundTasks, file_id: int):
-
-    # Trigger background task to run the party
     bt.add_task(magic, file_id=file_id)
-
     return Response("Started", status_code=202)
 
 
 def database_setup() -> None:
     g1 = datetime.now()
 
+    with open("/Users/ps/repos/traits-and-genes/backend/test.sql") as fcreate:
+        db_execute(fcreate.read())
+
     with db.getconn() as conn:
         with conn.cursor() as cur:
-            with open("/Users/ps/repos/traits-and-genes/backend/test.sql") as fcreate:
-                cur.execute(fcreate.read())
             with open(
                 "/Users/ps/repos/traits-and-genes/backend/gwas_catalog.tsv"
             ) as fpopulate:
                 cur.copy_from(fpopulate, "gwas")
-
-    # leaving contexts doesn't close the connection
     conn.close()
     print(f"GWAS loaded - {datetime.now()-g1}")
 
@@ -98,9 +100,7 @@ def magic(file_id: int) -> None:
     OUTPUT_TABLE = f"report{file_id}"
 
     stime = datetime.now()
-    print(f":::Starting the party")
-
-    print(f"building {file_id}")
+    print(f":::Starting the party : {file_id}")
 
     b1 = datetime.now()
     try:
@@ -108,6 +108,7 @@ def magic(file_id: int) -> None:
     except Exception as err:
         os.remove(FILEPATH)
         raise err
+
     print(f"snp built - {datetime.now()-b1}")
 
     m1 = datetime.now()
@@ -125,14 +126,7 @@ def magic(file_id: int) -> None:
 
     # remove non-standard tables and files
     os.remove(FILEPATH)
-
-    with db.getconn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(f"""DROP TABLE {OUTPUT_TABLE};""")
-
-    # leaving contexts doesn't close the connection
-    conn.close()
-
+    db_execute(f"DROP TABLE {OUTPUT_TABLE};")
     print(f":::End of party - {file_id} - {datetime.now()-stime}")
 
 
@@ -160,17 +154,12 @@ def load_myheritage(snp: SNPs, table_name: str) -> None:
     # issue: pandas default to sqlite when using DBAPI 2.0. we will write to CSV and load that to psql
     snp.snps.to_csv(filename)
 
+    db_execute(
+        f"create table {table_name} (rsid varchar,chrom varchar,pos varchar,genotype varchar);"
+    )
+
     with db.getconn() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                f"""
-                    create table {table_name} (
-                        rsid varchar,
-                        chrom varchar,
-                        pos varchar,
-                        genotype varchar
-                );"""
-            )
             with open(filename) as f:
                 cur.copy_from(file=f, table=table_name, sep=",")
 
@@ -181,10 +170,8 @@ def load_myheritage(snp: SNPs, table_name: str) -> None:
 
 def create_output(table_name: str, dna_table: str) -> None:
 
-    with db.getconn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                f"""
+    db_execute(
+        f"""
                 CREATE TABLE {table_name} AS 
                 SELECT DISTINCT {dna_table}.rsid                                  AS rsid,
                         {dna_table}.chrom                                AS chromosome,
@@ -202,8 +189,7 @@ def create_output(table_name: str, dna_table: str) -> None:
                     LEFT JOIN {GWAS_TABLE} 
                         ON {dna_table}.rsid = {GWAS_TABLE}."SNPS"
                 WHERE {GWAS_TABLE}."MAPPED_TRAIT" IS NOT NULL;"""
-            )
-    conn.close()
+    )
 
 
 def generate_report(table_name: str, filename: str) -> None:

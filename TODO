@@ -1,8 +1,5 @@
 TODO
 
-- DB setup.
-    - ADD PASSWORD TO DB. Store in env
-    - reorganize connection+cursor+commit etc
 - dockerise + automate deployment
     - nginx serving html and client js, proxy request to node
     - node backend to interact with frontend and matching service
@@ -24,6 +21,7 @@ https://genome.ucsc.edu/cgi-bin/hgTables?db=hg38&hgta_group=genes&hgta_track=ref
 HOW TO RUN:
 uvicorn app:app 
 yarn build && yarn run start
+docker run --name x -e POSTGRES_PASSWORD= -e POSTGRES_USER= -e POSTGRES_DB= -p 5432:5432 -d postgres:14
 
 DOWNLOAD GWAS: https://www.ebi.ac.uk/gwas/docs/file-download
 
