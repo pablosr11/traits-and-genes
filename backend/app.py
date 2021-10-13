@@ -132,11 +132,10 @@ def magic(file_id: int) -> None:
 
 def build_snp(fname: str) -> SNPs:
     try:
-        snp = SNPs(fname)  # sometimes errors out with som pandas C errors?
+        with open(fname, "rb") as f:
+            snp = SNPs(f.read())  # sometimes errors out with som pandas C errors?
     except Exception as err:
         raise err
-    # exampleerror: ValueError: invalid literal for int() with base 10: 'GG'
-    # pandas.errors.ParserError: Error tokenizing data. C error: Expected 4 fields in line 413885, saw 6
 
     if not snp.valid or snp.source != "MyHeritage":
         raise Exception("Errors during build. DF not valid or myheritage")
