@@ -1,28 +1,21 @@
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 
-import pandas as pd
 from fastapi import BackgroundTasks, FastAPI
 from snps import SNPs
-from sqlalchemy import create_engine
-from sqlalchemy.engine.base import Engine
-from sqlalchemy.pool.impl import QueuePool
 from starlette.responses import Response
 import os
+from os import environ as env
+import psycopg2.pool
 
 from urllib.request import urlretrieve
 
 GWAS_URL = "https://www.ebi.ac.uk/gwas/api/search/downloads/alternative"
 GWAS_FILEPATH = f"gwas_catalog.tsv"
 GWAS_TABLE = "gwas"
-DB_URL = "postgresql://ps@localhost:5432/dna"
 
 app = FastAPI()
-origins = ["null"]
-# how many connections (max users * connections used by user(3-4?)). Check postgres.
-db: Engine = create_engine(DB_URL, poolclass=QueuePool, pool_size=20)
-pool: QueuePool = db.pool
-
+origins = ["null"]  # only known ones
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -31,6 +24,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Lets check DB connection on startup for now.
+db = psycopg2.pool.ThreadedConnectionPool(
+    minconn=1,
+    maxconn=20,
+    dbname=env.get("DB_NAME"),
+    user=env.get("DB_USER"),
+    password=env.get("DB_PWD"),
+    host=env.get("DB_HOST"),
+    port=env.get("DB_PORT"),
+)
 
 @app.get("/")
 async def read_root():

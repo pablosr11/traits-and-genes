@@ -8,7 +8,6 @@ authors = ["ps <pablosr11@gmail.com>"]
 python = "^3.8"
 snps = "^2.3.0"
 fastapi = "^0.68.2"
-SQLAlchemy = "^1.4.25"
 uvicorn = "^0.15.0"
 psycopg2 = "^2.9.1"
 
