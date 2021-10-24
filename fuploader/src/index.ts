@@ -5,12 +5,13 @@ import axios from "axios";
 
 const app = express();
 const port = 8080; // default port to listen
-const HOST = `http://localhost:${port}`;
+const HOST = `http://0.0.0.0:${port}`;
+const MATCHING_SERVICE = "match:8000"
 
 // specify what origins can send request
 // null works for local html file, change when proxy server etc are setup
 const corsOptions = {
-  origin: `null`,
+  origin: `http://0.0.0.0`,
 };
 
 app.use(cors(corsOptions));
@@ -57,7 +58,7 @@ app.post("/upload", async (req, res) => {
     // use chunk id to detect missing packets
     // this ties data to the api. ideally we could send it to a DB with fileid, chunkid and totalchunk.
     // and consolidate it later.
-    fs.appendFileSync("/Users/ps/repos/traits-and-genes/uploads/" + fileId + ".csv", chunk);
+    fs.appendFileSync("./" + fileId + ".csv", chunk);
     console.log(
       `rcv ${chunkId} out of ${total} - ${chunk.length} goes in ${fileId}`
     );
@@ -69,7 +70,7 @@ app.post("/upload", async (req, res) => {
     console.log(`Upload completed: ${fileId}`);
     // trigger background job with ID fileId.
     // node blows up if backend is disconnected. Need better error handling and communication with frontend
-    await axios.post(`http://localhost:8000/candy/${fileId}`);
+    await axios.post(`http://${MATCHING_SERVICE}/candy/${fileId}`);
     res.status(200).send(`${HOST}/status/${fileId}`);
   } else {
     res.status(202).send("OK");
