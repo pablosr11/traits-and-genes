@@ -4,3 +4,5 @@ resources/
 gwas**
 **.db
 .env
+node_modules
+build
