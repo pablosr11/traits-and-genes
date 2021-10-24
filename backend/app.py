@@ -12,6 +12,8 @@ from urllib.request import urlretrieve
 
 GWAS_URL = "https://www.ebi.ac.uk/gwas/api/search/downloads/alternative"
 GWAS_FILEPATH = f"gwas_catalog.tsv"
+DB_SETUP_SQL = "./test.sql"
+GWAS_CATALOG_PATH = "./gwas_catalog.tsv"
 GWAS_TABLE = "gwas"
 
 app = FastAPI()
@@ -79,14 +81,12 @@ async def process_file(bt: BackgroundTasks, file_id: int):
 def database_setup() -> None:
     g1 = datetime.now()
 
-    with open("/Users/ps/repos/traits-and-genes/backend/test.sql") as fcreate:
+    with open(DB_SETUP_SQL) as fcreate:
         db_execute(fcreate.read())
 
     with db.getconn() as conn:
         with conn.cursor() as cur:
-            with open(
-                "/Users/ps/repos/traits-and-genes/backend/gwas_catalog.tsv"
-            ) as fpopulate:
+            with open(GWAS_CATALOG_PATH) as fpopulate:
                 cur.copy_from(fpopulate, "gwas")
     conn.close()
     print(f"GWAS loaded - {datetime.now()-g1}")
