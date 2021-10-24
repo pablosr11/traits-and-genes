@@ -57,7 +57,7 @@ async function uploadFile(
 ) {
   const chunkSize = 1_000_000; //1mb
   const chunkCount = Math.ceil(file.byteLength / chunkSize);
-  const url = `http://localhost:8080/upload?i=${file_id}`;
+  const url = `http://0.0.0.0:8080/upload?i=${file_id}`;
   for (let cid = 0; cid < chunkCount + 1; cid++) {
     const request_init: RequestInit = {
       method: "POST",
@@ -81,7 +81,7 @@ async function uploadFile(
 
 btnUpload.addEventListener("click", () => {
   const reader = new FileReader();
-  const theFile = fileInput.files[0];
+  const theFile = fileInput.files![0]; //coer
   // is this random enough? we might f up with bad identifier (eventhough we keep results for a small time)
   const fileName = Math.random() + theFile.name;
   const identifier = hashThis(fileName);
@@ -93,7 +93,7 @@ btnUpload.addEventListener("click", () => {
 
   // when file is entirely read... chunk it up and post it
   reader.onload = async (e) => {
-    let file_buffer = e.target.result as ArrayBuffer;
+    let file_buffer = e.target?.result as ArrayBuffer;
     uploadFile(file_buffer, identifier, progressTracker);
   };
   reader.readAsArrayBuffer(theFile);

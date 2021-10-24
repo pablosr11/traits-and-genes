@@ -1,0 +1,11 @@
+{
+  "main": "/dist/client.js",
+  "scripts": {
+    "build": "tsc -p ."
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^4.4.3"
+  },
+  "license": "WTFPL"
+}
